@@ -17,16 +17,16 @@ buildpacks, dans cet ordre :
 
 1. **APT** installe Google Chrome, qpdf, exiftool et des polices.
 2. **Go** compile Gotenberg v8.34.0 depuis les sources.
-3. **nginx** fait reverse proxy : port `8080` sur l'interface privée
+3. **nginx** sert de reverse proxy : port `8080` sur l'interface privée
    `=>` Gotenberg sur `127.0.0.1:9091`.
 
 Dans le conteneur, `supervisord` lance et surveille les deux processus, nginx
 et gotenberg. Il n'est pas le processus 1 : Scalingo lance la commande du
-`Procfile` depuis son script `/start`, qui garde ce rôle.
+`Procfile` depuis son script `/start`, qui reste le processus 1.
 
 Après la compilation, `bin/go-post-compile` télécharge le binaire pdfcpu et les
-données de césure de Chromium, puis allège les polices. Il n'y a pas de pdftk :
-qpdf et pdfcpu couvrent tous les usages.
+données de césure de Chromium, puis supprime les polices inutiles. Il n'y a pas
+de pdftk : qpdf et pdfcpu couvrent tous les usages.
 
 ## Déployer
 
@@ -39,8 +39,8 @@ git push scalingo main
 scalingo -a fondation-gotenberg scale app:1:L
 ```
 
-Le fichier `.buildpacks` active le mode multi-buildpack tout seul. Pas besoin
-de `BUILDPACK_URL`.
+La présence du fichier `.buildpacks` suffit à activer le mode multi-buildpack.
+Pas besoin de `BUILDPACK_URL`.
 
 ### Brancher l'api Fondation
 
@@ -51,7 +51,7 @@ privé, sur le port 8080.
 scalingo -a fondation-gotenberg private-networks-domain-names
 ```
 
-Ce nom se pose dans la variable `GOTENBERG_API_URL` de l'api, sans `/` final :
+Ce nom va dans la variable `GOTENBERG_API_URL` de l'api, sans `/` final :
 
 ```
 GOTENBERG_API_URL=http://app.ap-<id>.pn-<id>.private-network.internal:8080
@@ -113,8 +113,8 @@ marge est large.
 Sur Ubuntu 24.04, le paquet `chromium` d'APT est un stub snap, inutilisable
 dans un buildpack. On installe `google-chrome-stable` depuis le dépôt officiel
 Google. Le binaire est à `/app/.apt/opt/google/chrome/google-chrome`.
-Gotenberg le trouve par la variable d'environnement `CHROMIUM_BIN_PATH`, posée
-dans `scalingo.json`.
+Gotenberg le trouve grâce à la variable d'environnement `CHROMIUM_BIN_PATH`,
+définie dans `scalingo.json`.
 
 ### Version de Go
 
@@ -133,9 +133,10 @@ L'image du dernier déploiement fait 885 Mio sur Scalingo. Chiffres relevés le
 
 Le process type s'appelle `app` et non `web`. Le routeur public de Scalingo ne
 lui envoie donc aucun trafic. nginx écoute sur
-`$SCALINGO_PRIVATE_HOSTNAME:8080`, avec repli sur `127.0.0.1:8080`. Gotenberg
-reste sur `127.0.0.1:9091`. Les deux ports sont fixes, plus aucune dépendance à
-`$PORT`, qui n'est de toute façon injecté que pour un `web`.
+`$SCALINGO_PRIVATE_HOSTNAME:8080`. Si cette variable n'existe pas, il écoute
+sur `127.0.0.1:8080`. Gotenberg reste sur `127.0.0.1:9091`. Les deux ports sont fixes
+et ne dépendent plus de `$PORT`, que Scalingo n'injecte de toute façon que
+pour un `web`.
 
 Pour exposer publiquement, il faudrait renommer le process en `web` dans le
 `Procfile` et remettre `listen <%= ENV['PORT'] %>;` dans `servers.conf.erb`.
@@ -148,8 +149,9 @@ niveau `http { }`. `servers.conf.erb` est inclus à ce niveau.
 
 ### Orchestration de nginx
 
-Le buildpack fournit `/app/bin/run`, qui rend la configuration et lance nginx
-au premier plan. Si nginx meurt, ce script sort et supervisord le relance.
+Le buildpack fournit `/app/bin/run`, qui génère la configuration et lance nginx
+au premier plan. Si nginx meurt, ce script se termine et supervisord le
+relance.
 
 ## Fichiers
 
@@ -159,9 +161,9 @@ au premier plan. Si nginx meurt, ce script sort et supervisord le relance.
 | `Aptfile`             | paquets système et dépôt Google Chrome              |
 | `go.mod`, `main.go`   | wrapper minimal du binaire Gotenberg                |
 | `bin/go-pre-compile`  | génère `go.sum` s'il est absent                     |
-| `bin/go-post-compile` | télécharge pdfcpu et la césure Chromium, allège les polices |
-| `bin/start-gotenberg` | lance gotenberg, attend `/health`, tient la main    |
-| `.profile.d/supervisor.sh` | donne à supervisord, script Python, l'accès à son module |
+| `bin/go-post-compile` | télécharge pdfcpu et les données de césure de Chromium, supprime les polices inutiles |
+| `bin/start-gotenberg` | lance gotenberg, attend `/health`, puis reste au premier plan pour supervisord |
+| `.profile.d/supervisor.sh` | indique à supervisord, un script Python, où trouver son module |
 | `servers.conf.erb`    | server nginx, rate limit et upstream gotenberg      |
 | `supervisord.conf`    | orchestration de nginx (`bin/run`) et de gotenberg  |
 | `Procfile`            | `app: supervisord -c supervisord.conf`              |
@@ -171,7 +173,7 @@ au premier plan. Si nginx meurt, ce script sort et supervisord le relance.
 
 `bin/start-gotenberg` configure chaque opération PDF explicitement. L'option
 globale `--pdfengines-engines` est dépréciée dans Gotenberg 8. Dans chaque
-liste, l'ordre est l'ordre de repli.
+liste, le premier moteur est essayé d'abord et le second sert de secours.
 
 - `--pdfengines-merge-engines=qpdf,pdfcpu` : fusion
 - `--pdfengines-split-engines=pdfcpu,qpdf` : découpage
@@ -191,8 +193,8 @@ Pour activer ou désactiver d'autres routes Gotenberg, ajuster les options de
 ## Générer `go.sum` en local
 
 `bin/go-pre-compile` génère `go.sum` à la volée s'il est absent, en appelant
-`go mod tidy` sur le conteneur de build. C'est un filet de sécurité. Pour un
-build reproductible, mieux vaut le générer en local et le commiter :
+`go mod tidy` sur le conteneur de build. C'est une sécurité. Pour un build
+reproductible, mieux vaut le générer en local et le commiter :
 
 ```bash
 cd fondation-gotenberg
