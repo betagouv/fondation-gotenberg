@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Ce script est exécuté par le Go buildpack Scalingo après `go build`.
-# Il installe pdfcpu et pdftk-all.jar (téléchargements externes utilisés par
-# Gotenberg), ainsi qu'un wrapper `pdftk` pour l'exécuter via `java`.
+# Il télécharge le binaire pdfcpu et les données de césure de Chromium, puis
+# allège les polices installées par APT. Pas de pdftk ici, il faudrait une JRE.
 # Le buildpack déplace tout ce qui est écrit dans `bin/` du build dir vers
 # `/app/bin/` à l'exécution.
 
@@ -34,7 +34,7 @@ for lang in fr en-us en-gb; do
 done
 
 # Le binaire compilé par le Go buildpack s'appelle par défaut du nom du module
-# (`scalingo-gotenberg`). Rien à faire ici, mais on vérifie sa présence.
+# (`scalingo-gotenberg`). Rien à faire ici. On vérifie seulement sa présence.
 if [ ! -f bin/scalingo-gotenberg ]; then
   echo "WARN: bin/scalingo-gotenberg introuvable après compilation Go"
 fi

@@ -11,7 +11,7 @@ upstream gotenberg {
 
 # Volontairement PAS exposé sur Internet : on n'écoute pas sur `$PORT` (qui est
 # routé publiquement pour un process type `web`). On bind l'interface privée du
-# Private Network si elle existe, sinon on retombe sur le loopback — dans les
+# Private Network si elle existe, sinon on retombe sur le loopback. Dans les
 # deux cas, aucune requête venue d'Internet ne peut atteindre nginx.
 # Voir platform/networking/private de la doc Scalingo.
 server {

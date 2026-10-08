@@ -4,7 +4,7 @@ ca-certificates
 curl
 
 # Chrome via dépôt officiel Google (chromium n'est plus un vrai paquet APT
-# sur Ubuntu 24.04 — c'est un stub qui déclenche snap, indisponible sur
+# sur Ubuntu 24.04, c'est un stub qui déclenche snap, indisponible sur
 # le buildpack). Nécessite l'option [trusted=yes] pour éviter l'erreur
 # de signature GPG au moment du apt update.
 :repo:deb [trusted=yes] https://dl.google.com/linux/chrome/deb/ stable main
@@ -12,10 +12,12 @@ google-chrome-stable
 
 # Python : repris du Dockerfile officiel de Gotenberg, où il sert à LibreOffice
 # (unoconverter). Chromium ne s'en sert pas et LibreOffice est désactivé ici.
-# Le paquet n'est d'ailleurs pas présent dans /app/.apt après le build.
+# supervisord est bien un script Python. Il tourne avec le python3 de la
+# stack (voir .profile.d/supervisor.sh). Ce paquet n'apparaît d'ailleurs pas
+# dans /app/.apt après le build.
 python3
 
-# Moteurs PDF — on garde uniquement qpdf et pdfcpu (téléchargé dans
+# Moteurs PDF. On garde uniquement qpdf et pdfcpu (téléchargé dans
 # bin/go-post-compile). pdftk est écarté pour éviter d'embarquer une JRE.
 qpdf
 libimage-exiftool-perl

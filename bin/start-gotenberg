@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Lance gotenberg en arrière-plan, attend que /health réponde, puis reste au
 # premier plan pour supervisord. Si /health ne répond pas dans le délai, on
-# tue gotenberg et on sort en erreur — supervisord logue et redémarre.
+# tue gotenberg et on sort en erreur. supervisord logue et redémarre.
 
 HEALTH_URL="http://127.0.0.1:9091/health"
 HEALTH_TIMEOUT="${GOTENBERG_HEALTH_TIMEOUT:-90}"
