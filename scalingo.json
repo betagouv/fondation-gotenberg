@@ -1,13 +1,13 @@
 {
   "$schema": "https://raw.githubusercontent.com/Scalingo/developers-documentation/master/scalingo.schema.json",
-  "name": "scalingo-gotenberg",
+  "name": "fondation-gotenberg",
   "description": "Gotenberg + nginx - libreoffice", 
-  "repository": "https://github.com/jquagliatini/scalingo-gotenberg",
+  "repository": "https://github.com/betagouv/fondation-gotenberg",
   "stack": "scalingo-24",
   "formation": {
     "app": {
       "amount": 1,
-      "size": "M"
+      "size": "L"
     }
   },
   "env": {
@@ -23,6 +23,10 @@
     "EXIFTOOL_BIN_PATH": { "value": "/app/.apt/usr/bin/exiftool" },
     "QPDF_BIN_PATH": { "value": "/app/.apt/usr/bin/qpdf" },
     "OTEL_METRICS_EXPORTER": { "value": "none" },
-    "OTEL_LOGS_EXPORTER": { "value": "none" }
+    "OTEL_LOGS_EXPORTER": { "value": "none" },
+    "OTEL_TRACES_EXPORTER": {
+      "description": "Sans exportateur, Gotenberg logue une erreur après chaque conversion. Remplacer par un endpoint OTLP qui accepte les traces : sentry.incubateur.net ne les accepte pas.",
+      "value": "none"
+    }
   }
 }

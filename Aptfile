@@ -10,7 +10,9 @@ curl
 :repo:deb [trusted=yes] https://dl.google.com/linux/chrome/deb/ stable main
 google-chrome-stable
 
-# Python (utilisé par certaines routines de Chromium)
+# Python : repris du Dockerfile officiel de Gotenberg, où il sert à LibreOffice
+# (unoconverter). Chromium ne s'en sert pas et LibreOffice est désactivé ici.
+# Le paquet n'est d'ailleurs pas présent dans /app/.apt après le build.
 python3
 
 # Moteurs PDF — on garde uniquement qpdf et pdfcpu (téléchargé dans
@@ -18,7 +20,7 @@ python3
 qpdf
 libimage-exiftool-perl
 
-# Polices (reprises du Dockerfile gotenberg v8.34)
+# Polices (reprises du Dockerfile gotenberg v8.34, plus Montserrat)
 fonts-crosextra-carlito
 fonts-crosextra-caladea
 fonts-liberation
