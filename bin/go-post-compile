@@ -22,7 +22,7 @@ chmod +x bin/pdfcpu
 # pkg/modules/chromium). Chromium cherche `<dir>/<chromium-version>/hyph-<lang>.hyb`,
 # donc on conserve le sous-dossier versionné tel qu'il est dans l'image upstream.
 # Version alignée sur la release Gotenberg utilisée (cf. go.mod).
-GOTENBERG_REF="v8.34.0"
+GOTENBERG_REF="v8.38.1"
 CHROMIUM_HYPHEN_VERSION="120.0.6050.0"
 HYPHEN_DIR="chromium-hyphen-data/${CHROMIUM_HYPHEN_VERSION}"
 
