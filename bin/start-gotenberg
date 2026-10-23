@@ -9,15 +9,19 @@ HEALTH_URL="http://127.0.0.1:9091/health"
 HEALTH_TIMEOUT="${GOTENBERG_HEALTH_TIMEOUT:-90}"
 
 /app/bin/scalingo-gotenberg \
-  --api-port=9091 \
   --api-bind-ip=127.0.0.1 \
-  --pdfengines-merge-engines=qpdf,pdfcpu \
-  --pdfengines-split-engines=pdfcpu,qpdf \
-  --pdfengines-encrypt-engines=qpdf,pdfcpu \
-  --pdfengines-watermark-engines=pdfcpu \
-  --pdfengines-rotate-engines=pdfcpu \
-  --pdfengines-stamp-engines=pdfcpu \
+  --api-port=9091 \
+  --chromium-auto-start=true \
+  --chromium-max-concurrency=2 \
+  --chromium-max-queue-size=10 \
+  --chromium-start-timeout=60s \
   --pdfengines-convert-engines=pdfcpu \
+  --pdfengines-encrypt-engines=qpdf,pdfcpu \
+  --pdfengines-merge-engines=qpdf,pdfcpu \
+  --pdfengines-rotate-engines=pdfcpu \
+  --pdfengines-split-engines=pdfcpu,qpdf \
+  --pdfengines-stamp-engines=pdfcpu \
+  --pdfengines-watermark-engines=pdfcpu \
   --prometheus-disable-collect=true \
   &
 pid=$!
