@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Lance gotenberg en arrière-plan, attend que /health réponde, puis reste au
-# premier plan pour supervisord. Si /health ne répond pas dans le délai, on
-# tue gotenberg et on sort en erreur. supervisord logue et redémarre.
+: "${SCALINGO_PRIVATE_HOSTNAME:?is not set}"
 
-HEALTH_URL="http://127.0.0.1:9091/health"
-HEALTH_TIMEOUT="${GOTENBERG_HEALTH_TIMEOUT:-90}"
+# Gotenberg only binds to an IP address, while Scalingo only gives the private hostname
+ip=$(getent ahostsv4 "${SCALINGO_PRIVATE_HOSTNAME}" | awk 'NR == 1 { print $1 }' || true)
 
-/app/bin/scalingo-gotenberg \
-  --api-bind-ip=127.0.0.1 \
-  --api-port=9091 \
+# Falling back to the loopback would leave a healthy looking container that no app can reach
+if [ -z "${ip}" ]; then
+  echo "${SCALINGO_PRIVATE_HOSTNAME} does not resolve: Gotenberg would be unreachable from the private network" >&2
+  exit 1
+fi
+
+exec /app/bin/scalingo-gotenberg \
+  --api-bind-ip="${ip}" \
+  --api-port=8080 \
   --chromium-auto-start=true \
   --chromium-max-concurrency=2 \
   --chromium-max-queue-size=10 \
@@ -22,28 +26,4 @@ HEALTH_TIMEOUT="${GOTENBERG_HEALTH_TIMEOUT:-90}"
   --pdfengines-split-engines=pdfcpu,qpdf \
   --pdfengines-stamp-engines=pdfcpu \
   --pdfengines-watermark-engines=pdfcpu \
-  --prometheus-disable-collect=true \
-  &
-pid=$!
-
-trap 'kill -TERM "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' TERM INT
-
-deadline=$(( $(date +%s) + HEALTH_TIMEOUT ))
-until curl --silent --fail --max-time 2 "$HEALTH_URL" > /dev/null; do
-  if ! kill -0 "$pid" 2>/dev/null; then
-    echo "gotenberg s'est arrêté avant de devenir healthy" >&2
-    wait "$pid" 2>/dev/null || true
-    exit 1
-  fi
-  if [ "$(date +%s)" -gt "$deadline" ]; then
-    echo "gotenberg /health n'a pas répondu en ${HEALTH_TIMEOUT}s" >&2
-    kill -TERM "$pid" 2>/dev/null || true
-    wait "$pid" 2>/dev/null || true
-    exit 1
-  fi
-  sleep 1
-done
-
-echo "gotenberg est healthy sur ${HEALTH_URL}"
-
-wait "$pid"
+  --prometheus-disable-collect=true
