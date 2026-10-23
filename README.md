@@ -14,7 +14,7 @@ PDF" dans un navigateur.
 Un conteneur Scalingo sur la stack `scalingo-26`, assemblé par trois
 buildpacks dans cet ordre :
 
-1. **APT** installe Google Chrome, qpdf, exiftool et des polices.
+1. **APT** installe qpdf, exiftool, des polices et les bibliothèques de Chrome.
 2. **Go** compile Gotenberg v8.38.1 depuis les sources.
 3. **nginx** sert de reverse proxy : port `8080` sur l'interface privée
    `=>` Gotenberg sur `127.0.0.1:9091`.
@@ -23,7 +23,7 @@ Dans le conteneur, `supervisord` lance et surveille les deux processus, nginx
 et gotenberg. Il n'est pas le processus 1. Scalingo lance la commande du
 `Procfile` depuis son script `/start`, qui reste le processus 1.
 
-Après la compilation, `bin/go-post-compile` télécharge le binaire pdfcpu et les
+Après la compilation, `bin/go-post-compile` télécharge pdfcpu, Chrome et les
 données de césure de Chromium puis supprime les polices inutiles. Il n'y a pas
 de pdftk puisque qpdf et pdfcpu couvrent tous les usages.
 
@@ -99,7 +99,7 @@ Pour inspecter le conteneur lui-même :
 ```bash
 scalingo --region osc-secnum-fr1 -a <app> run bash
 > which qpdf exiftool pdfcpu
-> ls -la /app/.apt/opt/google/chrome/
+> $CHROMIUM_BIN_PATH --version
 > /app/bin/scalingo-gotenberg --help | head -50
 ```
 
@@ -159,13 +159,28 @@ Gotenberg abandonne une conversion après 30 s, sa valeur par défaut pour
 `--api-timeout`. Le plus gros document de Fondation se convertit en 2 s, la
 marge est large.
 
-### Chrome plutôt que Chromium
+### chrome-headless-shell, de Chrome for Testing
 
-Sur Ubuntu 24.04, le paquet `chromium` d'APT est un stub snap, inutilisable
-dans un buildpack. On installe `google-chrome-stable` depuis le dépôt officiel
-Google. Le binaire est à `/app/.apt/opt/google/chrome/google-chrome`.
-Gotenberg le trouve grâce à la variable d'environnement `CHROMIUM_BIN_PATH`,
-définie dans `.profile.d/gotenberg.sh`.
+Gotenberg pilote `chrome-headless-shell`, la variante de Chrome sans interface
+publiée par [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/).
+Elle pèse 274 Mo contre 434 Mo pour le Chrome complet. Chaque version est
+publiée à une adresse fixe. `bin/go-post-compile` en télécharge une version épinglée et
+vérifie son empreinte SHA-256 avant de la décompresser. Le binaire est à
+`/app/chrome-headless-shell-linux64/chrome-headless-shell`. Gotenberg le trouve
+grâce à la variable `CHROMIUM_BIN_PATH` de `.profile.d/gotenberg.sh`.
+
+Le dépôt APT de Google n'est plus utilisé. Sa signature ne pouvait pas être
+vérifiée par le buildpack et il ne garde que les dernières versions de Chrome.
+Sur Ubuntu, le paquet `chromium` d'APT est un stub snap, inutilisable dans un
+buildpack.
+
+Pour changer de version, prendre celle du canal Stable dans
+[last-known-good-versions-with-downloads.json](https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json),
+télécharger son archive `chrome-headless-shell-linux64.zip` et en calculer
+l'empreinte avec `shasum -a 256`. Puis reporter les deux valeurs dans
+`bin/go-post-compile`. Si Chrome refuse de démarrer, une bibliothèque manque.
+`ldd chrome-headless-shell | grep "not found"` dans l'image
+`scalingo/scalingo-26` la donne, à ajouter à l'`Aptfile`.
 
 ### Version de Go
 
@@ -201,8 +216,8 @@ relance.
 | `.buildpacks`         | ordre des buildpacks : APT `=>` Go `=>` nginx       |
 | `.profile.d/gotenberg.sh` | variables d'environnement, lues à chaque démarrage |
 | `.profile.d/supervisor.sh` | indique à supervisord, un script Python, où trouver son module |
-| `Aptfile`             | paquets système et dépôt Google Chrome              |
-| `bin/go-post-compile` | télécharge pdfcpu et les données de césure de Chromium, supprime les polices inutiles |
+| `Aptfile`             | paquets système et bibliothèques de Chrome          |
+| `bin/go-post-compile` | télécharge pdfcpu, Chrome et les données de césure de Chromium, supprime les polices inutiles |
 | `bin/go-pre-compile`  | génère `go.sum` s'il est absent                     |
 | `bin/start-gotenberg` | règle et lance gotenberg, attend `/health` puis reste au premier plan pour supervisord |
 | `go.mod`, `go.sum`, `main.go` | wrapper minimal du binaire Gotenberg et empreintes de ses dépendances |

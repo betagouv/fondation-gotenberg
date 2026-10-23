@@ -2,8 +2,9 @@
 set -euo pipefail
 
 # Ce script est exécuté par le Go buildpack Scalingo après `go build`.
-# Il télécharge le binaire pdfcpu et les données de césure de Chromium, puis
-# allège les polices installées par APT. Pas de pdftk ici, il faudrait une JRE.
+# Il télécharge pdfcpu, chrome-headless-shell et les données de césure de
+# Chromium puis allège les polices installées par APT. Pas de pdftk ici, il
+# faudrait une JRE.
 # Le buildpack déplace tout ce qui est écrit dans `bin/` du build dir vers
 # `/app/bin/` à l'exécution.
 
@@ -17,6 +18,17 @@ curl -sSfL "https://github.com/pdfcpu/pdfcpu/releases/download/v${PDFCPU_VERSION
   | tar -xJf - -C "${tmp}"
 mv "${tmp}"/pdfcpu_*/pdfcpu bin/pdfcpu
 chmod +x bin/pdfcpu
+
+# Chrome for Testing publishes each version at a fixed address: the build no longer
+# depends on the Google APT repository, whose signature could not be checked
+CHROME_VERSION="156.0.8078.47"
+CHROME_SHA256="0d5acc62c3e213f8c87d3c298d66ffcf9a236d12ea4b9f85318bf85dbc279daa"
+
+echo "-----> Installing chrome-headless-shell ${CHROME_VERSION}"
+curl -sSfL -o "${tmp}/chrome-headless-shell.zip" \
+  "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chrome-headless-shell-linux64.zip"
+echo "${CHROME_SHA256}  ${tmp}/chrome-headless-shell.zip" | sha256sum -c -
+unzip -q "${tmp}/chrome-headless-shell.zip" -d .
 
 # Fichiers d'hyphénation Chromium requis par Gotenberg (voir
 # pkg/modules/chromium). Chromium cherche `<dir>/<chromium-version>/hyph-<lang>.hyb`,
