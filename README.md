@@ -4,24 +4,22 @@ Le service qui transforme en PDF les documents de
 [Fondation](https://github.com/betagouv/fondation) : ordres du jour,
 procès-verbaux et notices.
 
-C'est un [Gotenberg](https://gotenberg.dev/) déployé sur Scalingo, derrière un
-reverse proxy nginx, sans LibreOffice. L'api Fondation lui envoie le HTML d'un
+C'est un [Gotenberg](https://gotenberg.dev/) déployé sur Scalingo, sans
+LibreOffice. L'api Fondation lui envoie le HTML d'un
 document et reçoit le PDF. Le rendu est fait par Chrome, comme un "Imprimer en
 PDF" dans un navigateur.
 
 ## Comment c'est construit
 
-Un conteneur Scalingo sur la stack `scalingo-26`, assemblé par trois
+Un conteneur Scalingo sur la stack `scalingo-26`, assemblé par deux
 buildpacks dans cet ordre :
 
 1. **APT** installe qpdf, exiftool, des polices et les bibliothèques de Chrome.
 2. **Go** compile Gotenberg v8.38.1 depuis les sources.
-3. **nginx** sert de reverse proxy : port `8080` sur l'interface privée
-   `=>` Gotenberg sur `127.0.0.1:9091`.
 
-Dans le conteneur, `supervisord` lance et surveille les deux processus, nginx
-et gotenberg. Il n'est pas le processus 1. Scalingo lance la commande du
-`Procfile` depuis son script `/start`, qui reste le processus 1.
+Le `Procfile` lance `bin/start-gotenberg`, qui résout l'adresse privée du
+conteneur puis s'efface devant Gotenberg (`exec`). Gotenberg écoute sur cette
+adresse, port `8080`. C'est le seul processus du conteneur.
 
 Après la compilation, `bin/go-post-compile` télécharge pdfcpu, Chrome et les
 données de césure de Chromium puis supprime les polices inutiles. Il n'y a pas
@@ -40,7 +38,7 @@ d'abord.
 Les apps sont créées par l'équipe infra de beta.gouv, dans le projet
 `incubateur-dinum/default`. C'est celui des apps de l'api et de leur Private
 Network. Créée d'abord dans `incubateur-dinum/fondation`, l'app de staging n'y
-démarrait pas, nginx ne trouvant pas le nom privé de son conteneur. L'api ne
+démarrait pas, le nom privé de son conteneur ne se résolvant pas. L'api ne
 l'aurait pas jointe non plus.
 
 ```bash
@@ -49,8 +47,8 @@ scalingo --region osc-secnum-fr1 -a fondation-gotenberg-staging stacks-set scali
 git push scalingo-staging main
 
 # Le process type s'appelle `app` et non `web` : il n'est pas routé depuis
-# Internet. Au premier déploiement, Scalingo démarre pourtant un `web` déclaré
-# par le buildpack nginx, qui plante. On l'arrête et on lance `app` à la main.
+# Internet. Un nouveau type démarre à zéro conteneur. On le lance donc à la main
+# et on arrête un éventuel `web` déclaré par défaut par un buildpack.
 scalingo --region osc-secnum-fr1 -a fondation-gotenberg-staging scale web:0 app:1:M
 ```
 
@@ -77,7 +75,8 @@ GOTENBERG_API_URL=http://app.ap-<id>.pn-<id>.private-network.internal:8080
 
 ## Vérifier que ça marche
 
-Les logs de démarrage doivent afficher "gotenberg est healthy" :
+Les logs de démarrage doivent afficher "Chromium automatically started" puis
+"server started on" suivi de l'adresse privée et du port 8080 :
 
 ```bash
 scalingo --region osc-secnum-fr1 -a <app> logs -n 200
@@ -141,9 +140,8 @@ de deux en même temps.
   lieu de six. C'est un garde-fou pour la mémoire, pas un gain mesuré
 - `--chromium-max-queue-size=10` : au-delà de dix conversions en attente,
   Gotenberg répond tout de suite 429 au lieu de laisser la file grandir
-- `--chromium-start-timeout=60s` : marge pour relancer Chromium après un
-  plantage, au lieu de 20 s. Elle reste sous les 90 s que
-  `bin/start-gotenberg` laisse à `/health`
+- `--chromium-start-timeout=60s` : marge pour lancer ou relancer Chromium,
+  au lieu de 20 s
 
 ### Traces OpenTelemetry : désactivées
 
@@ -191,40 +189,34 @@ une version antérieure de Gotenberg.
 ### Aucun port exposé sur Internet
 
 Le process type s'appelle `app` et non `web`. Le routeur public de Scalingo ne
-lui envoie donc aucun trafic. nginx écoute sur
-`$SCALINGO_PRIVATE_HOSTNAME:8080`. Si cette variable n'existe pas, il écoute
-sur `127.0.0.1:8080`. Gotenberg reste sur `127.0.0.1:9091`. Les deux ports sont fixes
-et ne dépendent plus de `$PORT`, que Scalingo n'injecte de toute façon que
-pour un `web`.
+lui envoie donc aucun trafic. Gotenberg écoute sur l'adresse privée du
+conteneur, port `8080`. Il n'accepte qu'une adresse IP, d'où la résolution de
+`SCALINGO_PRIVATE_HOSTNAME` par `bin/start-gotenberg`. Si le nom ne se résout
+pas, le script s'arrête en erreur plutôt que d'écouter ailleurs. Un service
+injoignable qui a l'air de fonctionner serait pire qu'une panne visible.
 
-### Pourquoi `servers.conf.erb` et non `nginx.conf.erb`
+### Ni nginx ni superviseur
 
-Le nginx-buildpack de Scalingo inclut `nginx.conf.erb` à l'intérieur d'un bloc
-`server { }` déjà déclaré. Or `limit_req_zone` et `upstream` doivent être au
-niveau `http { }`. `servers.conf.erb` est inclus à ce niveau.
-
-### Orchestration de nginx
-
-Le buildpack fournit `/app/bin/run`, qui génère la configuration et lance nginx
-au premier plan. Si nginx meurt, ce script se termine et supervisord le
-relance.
+Si Gotenberg s'arrête, le conteneur s'arrête avec lui. Scalingo le redémarre et
+l'inscrit dans la timeline de l'app. Jusqu'en octobre 2026, supervisord
+relançait Gotenberg dans le conteneur. Le 27/07/2026, il l'a abandonné deux
+fois après trois échecs de démarrage. Le conteneur restait "running" et nginx
+répondait "ok" sur `/health`, alors qu'aucun PDF ne sortait. `/health` est
+désormais celui de Gotenberg, qui vérifie aussi Chromium.
 
 ## Fichiers
 
 | Fichier               | Rôle                                                |
 | --------------------- | --------------------------------------------------- |
-| `.buildpacks`         | ordre des buildpacks : APT `=>` Go `=>` nginx       |
+| `.buildpacks`         | ordre des buildpacks : APT `=>` Go                  |
 | `.profile.d/gotenberg.sh` | variables d'environnement, lues à chaque démarrage |
-| `.profile.d/supervisor.sh` | indique à supervisord, un script Python, où trouver son module |
 | `Aptfile`             | paquets système et bibliothèques de Chrome          |
 | `bin/go-post-compile` | télécharge pdfcpu, Chrome et les données de césure de Chromium, supprime les polices inutiles |
 | `bin/go-pre-compile`  | génère `go.sum` s'il est absent                     |
-| `bin/start-gotenberg` | règle et lance gotenberg, attend `/health` puis reste au premier plan pour supervisord |
+| `bin/start-gotenberg` | résout l'adresse privée puis lance gotenberg avec ses réglages |
 | `go.mod`, `go.sum`, `main.go` | wrapper minimal du binaire Gotenberg et empreintes de ses dépendances |
-| `Procfile`            | `app: supervisord -c supervisord.conf`              |
+| `Procfile`            | `app: bin/start-gotenberg`                          |
 | `scalingo.json`       | stack et taille du conteneur                        |
-| `servers.conf.erb`    | server nginx, rate limit et upstream gotenberg      |
-| `supervisord.conf`    | orchestration de nginx (`bin/run`) et de gotenberg  |
 
 ## Moteurs PDF
 

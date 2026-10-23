@@ -1,5 +1,4 @@
 # Base
-tini
 ca-certificates
 curl
 
@@ -18,13 +17,6 @@ libxfixes3
 libxkbcommon0
 libxrandr2
 
-# Python : repris du Dockerfile officiel de Gotenberg, où il sert à LibreOffice
-# (unoconverter). Chromium ne s'en sert pas et LibreOffice est désactivé ici.
-# supervisord est bien un script Python. Il tourne avec le python3 de la
-# stack (voir .profile.d/supervisor.sh). Ce paquet n'apparaît d'ailleurs pas
-# dans /app/.apt après le build.
-python3
-
 # Moteurs PDF. On garde uniquement qpdf et pdfcpu (téléchargé dans
 # bin/go-post-compile). pdftk est écarté pour éviter d'embarquer une JRE.
 qpdf
@@ -40,6 +32,3 @@ fonts-noto-cjk
 fonts-noto-color-emoji
 fonts-noto-core
 fonts-montserrat
-
-# supervisord
-supervisor

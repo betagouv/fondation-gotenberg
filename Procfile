@@ -1,1 +1,1 @@
-app: supervisord -c supervisord.conf
+app: bin/start-gotenberg

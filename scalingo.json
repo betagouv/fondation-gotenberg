@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/Scalingo/developers-documentation/master/scalingo.schema.json",
-  "description": "Gotenberg + nginx - libreoffice",
+  "description": "Gotenberg without LibreOffice",
   "formation": {
     "app": {
       "amount": 1,
