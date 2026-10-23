@@ -3,12 +3,20 @@ tini
 ca-certificates
 curl
 
-# Chrome via dépôt officiel Google (chromium n'est plus un vrai paquet APT
-# sur Ubuntu 24.04, c'est un stub qui déclenche snap, indisponible sur
-# le buildpack). Nécessite l'option [trusted=yes] pour éviter l'erreur
-# de signature GPG au moment du apt update.
-:repo:deb [trusted=yes] https://dl.google.com/linux/chrome/deb/ stable main
-google-chrome-stable
+# Shared libraries of chrome-headless-shell, installed by bin/go-post-compile,
+# that the scalingo-26 stack does not ship (found with ldd on its image)
+libasound2t64
+libatk-bridge2.0-0t64
+libatk1.0-0t64
+libatspi2.0-0t64
+libgbm1
+libnspr4
+libnss3
+libxcomposite1
+libxdamage1
+libxfixes3
+libxkbcommon0
+libxrandr2
 
 # Python : repris du Dockerfile officiel de Gotenberg, où il sert à LibreOffice
 # (unoconverter). Chromium ne s'en sert pas et LibreOffice est désactivé ici.

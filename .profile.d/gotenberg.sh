@@ -1,4 +1,4 @@
-export CHROMIUM_BIN_PATH="/app/.apt/opt/google/chrome/google-chrome"
+export CHROMIUM_BIN_PATH="/app/chrome-headless-shell-linux64/chrome-headless-shell"
 export CHROMIUM_HYPHEN_DATA_DIR_PATH="/app/chromium-hyphen-data"
 
 export EXIFTOOL_BIN_PATH="/app/.apt/usr/bin/exiftool"
