@@ -52,8 +52,16 @@ git push scalingo-staging main
 scalingo --region osc-secnum-fr1 -a fondation-gotenberg-staging scale web:0 app:1:M
 ```
 
-Même chose pour la production avec le remote `scalingo-production` et une
-taille L (voir [Taille du conteneur](#taille-du-conteneur)).
+Même chose pour la production avec le remote `scalingo-production`.
+
+Le premier push d'une nouvelle app échoue avec "Task 'web' has not been found
+in your 'Procfile'". Le build est pourtant bon. Après le `scale`, on redéploie
+le même commit sous forme d'archive :
+
+```bash
+git archive --format=tar.gz --prefix=app/ -o /tmp/gotenberg.tar.gz main
+scalingo --region osc-secnum-fr1 -a <app> deploy /tmp/gotenberg.tar.gz $(git rev-parse --short main)
+```
 
 La présence du fichier `.buildpacks` suffit à activer le mode multi-buildpack.
 Pas besoin de `BUILDPACK_URL`.
@@ -106,17 +114,17 @@ scalingo --region osc-secnum-fr1 -a <app> run bash
 
 ### Taille du conteneur
 
-Production en L, staging en M.
+Staging et production en M.
 
 Avant les réglages de Chromium ci-dessous, M ne suffisait pas. La mémoire
 était au plafond, le swap saturé et une conversion sur cinq finissait en
-erreur après 20 ou 30 s. C'est la panne du 7 octobre 2026. En L, un
-document de 700 dossiers se convertit en 2 s.
+erreur après 20 ou 30 s. C'est la panne du 7 octobre 2026. L'ancienne app
+était donc passée en L.
 
-Avec ces réglages, staging tourne en M pour vérifier que la production peut y
-descendre. Scalingo supprime progressivement le swap des conteneurs.
-`fondation-gotenberg-staging`, créée en octobre 2026, n'en a déjà plus. La
-mesure doit donc tenir sans lui.
+Avec ces réglages et sans nginx ni superviseur, Gotenberg occupait 134 Mo
+après deux rendus sur staging. Les apps créées en octobre 2026 n'ont pas de
+swap, que Scalingo supprime progressivement. Sur chacune, une alerte prévient
+quand la mémoire dépasse 80 % pendant 3 minutes.
 
 ### Une conversion, un contexte de navigateur
 
