@@ -12,6 +12,8 @@ if [ -z "${ip}" ]; then
   exit 1
 fi
 
+/app/bin/warm-chromium "${ip}:8080" &
+
 exec /app/bin/scalingo-gotenberg \
   --api-bind-ip="${ip}" \
   --api-port=8080 \
@@ -19,7 +21,6 @@ exec /app/bin/scalingo-gotenberg \
   --chromium-max-concurrency=2 \
   --chromium-max-queue-size=10 \
   --chromium-start-timeout=60s \
-  --log-level=debug \
   --pdfengines-convert-engines=pdfcpu \
   --pdfengines-encrypt-engines=qpdf,pdfcpu \
   --pdfengines-merge-engines=qpdf,pdfcpu \

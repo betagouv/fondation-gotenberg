@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# An idle Chromium loses its memory: the first document after a few hours then waits up to 20s.
+# A health check only brings part of it back, hence a real render.
+readonly address="$1"
+readonly page='<!doctype html><html><head><style>p { color: black; }</style></head><body><p>warm-up</p><script>window.status = "OK";</script></body></html>'
+readonly seconds_between_renders=900
+
+while true; do
+  curl --fail \
+    --form "files=@-;filename=index.html;type=text/html" \
+    --form "waitForExpression=window.status === 'OK'" \
+    --max-time 60 \
+    --output /dev/null \
+    --retry 5 \
+    --retry-connrefused \
+    --retry-delay 5 \
+    --show-error \
+    --silent \
+    "http://${address}/forms/chromium/convert/html" <<<"${page}" \
+    || echo "warm-chromium: the render failed" >&2
+
+  sleep "${seconds_between_renders}"
+done

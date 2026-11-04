@@ -19,7 +19,10 @@ buildpacks dans cet ordre :
 
 Le `Procfile` lance `bin/start-gotenberg`, qui résout l'adresse privée du
 conteneur puis s'efface devant Gotenberg (`exec`). Gotenberg écoute sur cette
-adresse, port `8080`. C'est le seul processus du conteneur.
+adresse, port `8080`. À côté de lui, `bin/warm-chromium` fait un petit rendu
+toutes les 15 minutes. Sans ce rendu, le premier document généré après plusieurs
+heures d'inactivité peut attendre jusqu'à 20s, le temps que Chrome recharge sa
+mémoire.
 
 Après la compilation, `bin/go-post-compile` télécharge pdfcpu, Chrome et les
 données de césure de Chromium puis supprime les polices inutiles. Il n'y a pas
