@@ -121,7 +121,7 @@ Staging et production en M.
 
 Avant les réglages de Chromium ci-dessous, M ne suffisait pas. La mémoire
 était au plafond, le swap saturé et une conversion sur cinq finissait en
-erreur après 20 ou 30 s. C'est la panne du 7 octobre 2026. L'ancienne app
+erreur après 20 ou 30s. C'est la panne du 7 octobre 2026. L'ancienne app
 était donc passée en L.
 
 Avec ces réglages et sans nginx ni superviseur, Gotenberg occupait 134 Mo
@@ -145,14 +145,14 @@ de deux en même temps.
 
 - `--chromium-auto-start=true` : Chromium démarre avec le conteneur et non à
   la première conversion. Scalingo redémarre régulièrement le conteneur et un
-  Chromium lancé à froid a déjà dépassé les 20 s permises,
+  Chromium lancé à froid a déjà dépassé les 20s permises,
   faisant échouer la conversion de la personne qui attendait son PDF
 - `--chromium-max-concurrency=2` : deux conversions en parallèle au plus, au
   lieu de six. C'est un garde-fou pour la mémoire, pas un gain mesuré
 - `--chromium-max-queue-size=10` : au-delà de dix conversions en attente,
   Gotenberg répond tout de suite 429 au lieu de laisser la file grandir
 - `--chromium-start-timeout=60s` : marge pour lancer ou relancer Chromium,
-  au lieu de 20 s
+  au lieu de 20s
 
 ### Traces OpenTelemetry : désactivées
 
@@ -162,10 +162,21 @@ collecteur n'accepte les traces. Sans elle, Gotenberg vise `localhost:4318` et
 logue une erreur après chaque conversion. L'instance `sentry.incubateur.net` ne
 reçoit pas de traces OTLP et répond 403.
 
-### Délai par requête : 30 s
+### Erreurs envoyées à Sentry
 
-Gotenberg abandonne une conversion après 30 s, sa valeur par défaut pour
-`--api-timeout`. Le plus gros document de Fondation se convertit en 2 s, la
+`sentry.go` envoie au projet Sentry `fondation-gotenberg` les réponses 5xx et
+429 de Gotenberg. Le tag `correlation_id` retrouve la ligne de log sur Scalingo.
+Les erreurs hors requête et celles des webhooks n'y arrivent pas. Un plantage
+du code de Gotenberg pendant une conversion y arrive comme un `hard timeout`
+sans sa cause.
+
+Le module lit `SENTRY_DSN` et `SENTRY_ENVIRONMENT`. Sans `SENTRY_DSN` ou avec un
+DSN invalide, il ne fait rien.
+
+### Délai par requête : 30s
+
+Gotenberg abandonne une conversion après 30s, sa valeur par défaut pour
+`--api-timeout`. Le plus gros document de Fondation se convertit en 2s, la
 marge est large.
 
 ### chrome-headless-shell, de Chrome for Testing
@@ -226,6 +237,7 @@ désormais celui de Gotenberg, qui vérifie aussi Chromium.
 | `bin/go-pre-compile`  | génère `go.sum` s'il est absent                     |
 | `bin/start-gotenberg` | résout l'adresse privée puis lance gotenberg avec ses réglages |
 | `go.mod`, `go.sum`, `main.go` | wrapper minimal du binaire Gotenberg et empreintes de ses dépendances |
+| `sentry.go`           | module Gotenberg qui envoie les 5xx et 429 à Sentry |
 | `Procfile`            | `app: bin/start-gotenberg`                          |
 | `scalingo.json`       | stack et taille du conteneur                        |
 
