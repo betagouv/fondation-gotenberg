@@ -20,7 +20,7 @@ func init() {
 	gotenberg.MustRegisterModule(new(Sentry))
 }
 
-// Sentry sends to Sentry the requests Gotenberg fails to serve.
+// Sentry sends to Sentry the requests Gotenberg fails to serve
 type Sentry struct {
 	enabled        bool
 	disabledReason string
@@ -34,7 +34,7 @@ func (s *Sentry) Descriptor() gotenberg.ModuleDescriptor {
 	}
 }
 
-// Provision only disables the module on a bad DSN so that monitoring never keeps the PDF service from starting.
+// Provision only disables the module on a bad DSN so that monitoring never keeps the PDF service from starting
 func (s *Sentry) Provision(*gotenberg.Context) error {
 	if os.Getenv("SENTRY_DSN") == "" {
 		s.disabledReason = "SENTRY_DSN is not set"
@@ -57,8 +57,8 @@ func (s *Sentry) Provision(*gotenberg.Context) error {
 	return nil
 }
 
-// Middlewares captures the 5xx and the 429 sent when the Chromium queue is full.
-// Gotenberg turns a panic in a route into a hard timeout error that lands here.
+// Middlewares captures the 5xx and the 429 sent when the Chromium queue is full
+// Gotenberg turns a panic in a route into a hard timeout error that lands here
 func (s *Sentry) Middlewares() ([]api.Middleware, error) {
 	if !s.enabled {
 		return nil, nil
@@ -91,9 +91,11 @@ func (s *Sentry) Middlewares() ([]api.Middleware, error) {
 					if correlationId, ok := c.Get("correlationId").(string); ok {
 						scope.SetTag("correlation_id", correlationId)
 					}
+					// Every error has the stack of this middleware so Sentry would group them all into one issue
+					scope.SetFingerprint([]string{c.Request().URL.Path, strconv.Itoa(status), rootCause(err).Error()})
 					hub.CaptureException(err)
 				})
-				// Gotenberg stops this module while the API still drains requests. Flushing otherwise would delay every error response.
+				// Gotenberg stops this module while the API still drains requests. Flushing otherwise would delay every error response
 				if s.stopping.Load() {
 					hub.Flush(2 * time.Second)
 				}
@@ -104,7 +106,7 @@ func (s *Sentry) Middlewares() ([]api.Middleware, error) {
 	}}, nil
 }
 
-// Start does nothing. The module is an App only to get Stop.
+// Start does nothing. The module is an App only to get Stop
 func (s *Sentry) Start() error {
 	return nil
 }
@@ -116,13 +118,24 @@ func (s *Sentry) StartupMessage() string {
 	return "sends errors to Sentry"
 }
 
-// Stop sends what is left before Scalingo restarts the container.
+// Stop sends what is left before Scalingo restarts the container
 func (s *Sentry) Stop(context.Context) error {
 	s.stopping.Store(true)
 	if s.enabled {
 		sentry.Flush(5 * time.Second)
 	}
 	return nil
+}
+
+// rootCause stops at errors.Join: no single joined error is the cause
+func rootCause(err error) error {
+	for {
+		next := errors.Unwrap(err)
+		if next == nil {
+			return err
+		}
+		err = next
+	}
 }
 
 var (
